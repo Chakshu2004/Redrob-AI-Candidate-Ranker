@@ -1,0 +1,88 @@
+# Redrob Hackathon — Submission Metadata
+# Fill in the placeholders marked <FILL_ME> before submitting.
+
+# ============================================================================
+# Team identity
+# ============================================================================
+team_name: "<FILL_ME>"
+
+primary_contact:
+  name: "Chakshu <FILL_ME>"
+  email: "<FILL_ME>@example.com"
+  phone: "+91-<FILL_ME>"
+
+team_members:
+  - name: "Chakshu <FILL_ME>"
+    email: "<FILL_ME>@example.com"
+    role: "ML Engineer"
+
+# ============================================================================
+# Code and reproducibility
+# ============================================================================
+github_repo: "<FILL_ME - e.g. https://github.com/your-username/redrob-ranker>"
+
+sandbox_link: "<FILL_ME - e.g. https://huggingface.co/spaces/your-username/redrob-ranker>"
+
+reproduce_command: "python rank.py --candidates ./candidates.jsonl --out ./submission.csv"
+
+# ============================================================================
+# Compute environment
+# ============================================================================
+compute:
+  platform: "<FILL_ME - e.g. Local Linux box / AWS EC2 c5.2xlarge>"
+  cpu_cores: 4
+  ram_gb: 16
+  python_version: "3.12"
+  os: "Ubuntu 24.04"
+  uses_gpu_for_inference: false
+  has_network_during_ranking: false
+  pre_computation_required: false
+  pre_computation_time_minutes: 0
+
+# ============================================================================
+# AI tools declaration
+# ============================================================================
+ai_tools_used:
+  - "Claude"
+
+ai_usage_summary: |
+  Used Claude (Anthropic) for architecture design, scoring-logic design, and
+  implementation of the ranking pipeline (feature extraction, TF-IDF semantic
+  similarity, honeypot detection, hybrid scoring, and explanation generation).
+  No candidate data was sent to any hosted LLM or external API at any point;
+  the ranking pipeline itself makes zero network calls.
+
+# ============================================================================
+# Approach summary
+# ============================================================================
+methodology_summary: |
+  Hybrid ranker combining: (1) local TF-IDF cosine similarity between each
+  candidate's profile text and a JD text derived from a structured role
+  profile (15% weight, deliberately modest to resist keyword-stuffed
+  profiles); (2) skill-category alignment against the JD's required
+  (embeddings/retrieval, vector DB/hybrid search, Python, eval frameworks)
+  and preferred (LLM fine-tuning, learning-to-rank, distributed systems,
+  HR-tech, open source) categories, weighted by skill_assessment_scores
+  (25%); (3) experience-band fit plus the fraction of career history in
+  applied-ML/AI roles (25%); (4) a domain-fit screen implementing the JD's
+  explicit disqualifiers -- pure research, IT-services-only, framework-
+  tutorial-only, CV/speech/robotics-only, title-chasing, architecture-only
+  roles (20%); and (5) a behavioral-availability score from the 23
+  redrob_signals fields -- open-to-work, notice period, recency, recruiter
+  response/interview/offer rates, location/relocation fit (15%). Honeypot
+  candidates are detected via internal-consistency checks (expert-skill
+  duration mismatches, experience arithmetic, education date impossibilities,
+  overlapping roles) and have their score multiplied by 0.05. Per-candidate
+  reasoning is generated from each candidate's own feature values using
+  hash-selected sentence templates -- no LLM, fully reproducible. Runtime:
+  ~60s / ~3.3GB RAM for 100K candidates on CPU.
+
+# ============================================================================
+# Declarations
+# ============================================================================
+declarations:
+  read_submission_spec: true
+  code_is_original_work: true
+  no_collusion: true
+  honeypot_check_done: true
+  reproduction_tested: true
