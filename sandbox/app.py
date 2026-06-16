@@ -146,8 +146,43 @@ col_a.metric("Candidates evaluated", n_total)
 col_b.metric("Top candidates shown", top_count)
 col_c.metric("Honeypots flagged", honeypot_count)
 
-leaderboard_df = pd.DataFrame(rows)[["rank", "candidate_id", "score", "title", "years_exp", "location", "honeypot"]]
-st.dataframe(leaderboard_df, use_container_width=True, hide_index=True)
+# --- Interactive controls: search / score filter / sort
+with st.expander("Controls", expanded=False):
+    search_text = st.text_input("Search by candidate id or title", value="")
+    min_score = st.slider("Minimum score to include", 0.0, 1.0, 0.0, 0.01)
+    sort_by = st.selectbox("Sort results by", options=["rank", "score", "years_exp"], index=0)
+    show_reasoning_col = st.checkbox("Show reasoning column in table", value=False)
+
+leaderboard_df = pd.DataFrame(rows)[["rank", "candidate_id", "score", "title", "years_exp", "location", "honeypot", "reasoning"]]
+
+# Apply search and score filters
+if search_text:
+    mask = (
+        leaderboard_df["candidate_id"].str.contains(search_text, case=False, na=False)
+        | leaderboard_df["title"].fillna("").str.contains(search_text, case=False, na=False)
+    )
+    leaderboard_df = leaderboard_df[mask]
+leaderboard_df = leaderboard_df[leaderboard_df["score"] >= min_score]
+
+# Add simple badges for top 3
+def _badge(rank):
+    return {1: "🥇", 2: "🥈", 3: "🥉"}.get(rank, "")
+
+leaderboard_df["badge"] = leaderboard_df["rank"].apply(_badge)
+
+if sort_by == "score":
+    leaderboard_df = leaderboard_df.sort_values(by=["score", "rank"], ascending=[False, True])
+elif sort_by == "years_exp":
+    leaderboard_df = leaderboard_df.sort_values(by=["years_exp", "rank"], ascending=[False, True])
+else:
+    leaderboard_df = leaderboard_df.sort_values(by=["rank"]) 
+
+# Choose displayed columns
+display_cols = ["badge", "rank", "candidate_id", "score", "title", "years_exp", "location", "honeypot"]
+if show_reasoning_col:
+    display_cols.append("reasoning")
+
+st.dataframe(leaderboard_df[display_cols].reset_index(drop=True), use_container_width=True, hide_index=True)
 
 csv_bytes = format_download(rows)
 st.download_button(
