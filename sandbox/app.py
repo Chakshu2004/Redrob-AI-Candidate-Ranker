@@ -140,14 +140,17 @@ except ValueError as exc:
 
 top_count = len(rows)
 
-st.subheader(f"Leaderboard — top {top_count} of {n_total} candidates")
-col_a, col_b, col_c = st.columns([1, 1, 1])
-col_a.metric("Candidates evaluated", n_total)
-col_b.metric("Top candidates shown", top_count)
-col_c.metric("Honeypots flagged", honeypot_count)
+# --- Summary metrics dashboard
+st.subheader("📊 Dashboard")
+col_a, col_b, col_c, col_d = st.columns(4)
+col_a.metric("📋 Evaluated", n_total)
+col_b.metric("🏆 Top candidates", top_count)
+col_c.metric("⚠️ Honeypots", honeypot_count)
+avg_score = round(pd.DataFrame(rows)["score"].mean(), 3)
+col_d.metric("📈 Avg score", f"{avg_score:.3f}")
 
 # --- Interactive controls: search / score filter / sort
-with st.expander("Controls", expanded=False):
+with st.expander("🔧 Controls", expanded=False):
     search_text = st.text_input("Search by candidate id or title", value="")
     min_score = st.slider("Minimum score to include", 0.0, 1.0, 0.0, 0.01)
     sort_by = st.selectbox("Sort results by", options=["rank", "score", "years_exp"], index=0)
@@ -182,60 +185,142 @@ display_cols = ["badge", "rank", "candidate_id", "score", "title", "years_exp", 
 if show_reasoning_col:
     display_cols.append("reasoning")
 
-st.dataframe(leaderboard_df[display_cols].reset_index(drop=True), use_container_width=True, hide_index=True)
+# --- Tabbed interface
+tab_leaderboard, tab_stats, tab_compare = st.tabs(["🏅 Leaderboard", "📊 Statistics", "⚖️ Compare"])
 
-csv_bytes = format_download(rows)
-st.download_button(
-    label="Download ranked CSV",
-    data=csv_bytes,
-    file_name="ranked_candidates.csv",
-    mime="text/csv",
-)
+with tab_leaderboard:
+    st.dataframe(leaderboard_df[display_cols].reset_index(drop=True), use_container_width=True, hide_index=True)
+    csv_bytes = format_download(rows)
+    st.download_button(
+        label="📥 Download ranked CSV",
+        data=csv_bytes,
+        file_name="ranked_candidates.csv",
+        mime="text/csv",
+    )
+
+with tab_stats:
+    stats_col1, stats_col2 = st.columns(2)
+    
+    with stats_col1:
+        st.subheader("Score Distribution")
+        score_data = pd.DataFrame(rows)["score"]
+        st.bar_chart(score_data.value_counts(bins=10).sort_index(), use_container_width=True)
+        
+        st.subheader("Experience Distribution")
+        exp_data = pd.DataFrame(rows)["years_exp"].value_counts().sort_index()
+        st.bar_chart(exp_data, use_container_width=True)
+    
+    with stats_col2:
+        st.subheader("Top Locations")
+        loc_data = pd.DataFrame(rows)["location"].value_counts().head(10)
+        st.bar_chart(loc_data, use_container_width=True)
+        
+        st.subheader("Quick Stats")
+        stats_df = pd.DataFrame(rows)
+        st.write(f"- **Min score:** {stats_df['score'].min():.3f}")
+        st.write(f"- **Max score:** {stats_df['score'].max():.3f}")
+        st.write(f"- **Median score:** {stats_df['score'].median():.3f}")
+        st.write(f"- **Std dev:** {stats_df['score'].std():.3f}")
+        st.write(f"- **Avg experience:** {stats_df['years_exp'].mean():.1f} years")
+
+with tab_compare:
+    st.subheader("Compare Candidates")
+    compare_df = leaderboard_df[["badge", "candidate_id", "score", "title", "years_exp", "location"]]
+    selected_candidates = st.multiselect(
+        "Select up to 3 candidates to compare",
+        compare_df["candidate_id"].tolist(),
+        max_selections=3,
+    )
+    
+    if selected_candidates:
+        comparison_rows = []
+        for cid in selected_candidates:
+            row_data = compare_df[compare_df["candidate_id"] == cid].iloc[0]
+            comparison_rows.append(row_data)
+        
+        compare_table = pd.DataFrame(comparison_rows)
+        st.dataframe(compare_table, use_container_width=True, hide_index=True)
+        
+        # Side-by-side score bars
+        st.subheader("Score Comparison")
+        for cid in selected_candidates:
+            row = compare_df[compare_df["candidate_id"] == cid].iloc[0]
+            score_val = row["score"]
+            title_val = row["title"]
+            st.progress(score_val, text=f"{cid} — {title_val} — {score_val:.3f}")
+    else:
+        st.info("👆 Select 1-3 candidates above to compare their profiles side by side.")
 
 st.markdown("---")
 
-st.subheader("Candidate detail")
-selected_id = st.selectbox("Select a candidate to inspect", leaderboard_df["candidate_id"].tolist())
+st.subheader("🔍 Candidate Deep Dive")
+selected_id = st.selectbox("👤 Select a candidate to inspect", leaderboard_df["candidate_id"].tolist())
 selected_idx = leaderboard_df.index[leaderboard_df["candidate_id"] == selected_id][0]
 feats, sc, hp, explanation = full_results[selected_idx]
 
+# Create a styled header card
+score_val = sc['final_score']
+score_pct = f"{score_val:.1%}"
+score_color = "🟢" if score_val >= 0.7 else "🟡" if score_val >= 0.5 else "🔴"
+
+col_header1, col_header2, col_header3 = st.columns([2, 1, 1])
+with col_header1:
+    st.markdown(f"### {feats['current_title']} @ {feats['current_company']}")
+    st.write(f"📍 {feats['location']} | 📅 {feats['years_of_experience']:.1f} yrs exp | {feats['candidate_id']}")
+with col_header2:
+    st.metric("Match Score", score_pct)
+with col_header3:
+    if hp["is_honeypot"]:
+        st.error("⚠️ Honeypot")
+    else:
+        st.success("✅ Valid")
+
+# Two-column detail layout
 score_col, detail_col = st.columns([1, 2])
 with score_col:
-    st.metric("Overall match score", f"{sc['final_score']:.2%}")
-    st.write("**Score breakdown**")
+    st.write("**Score Breakdown**")
     for k, v in sc["sub_scores"].items():
-        st.progress(v, text=f"{k}: {v:.2f} (weight {config.WEIGHTS[k]:.0%})")
+        color_bar = "🟢" if v >= 0.7 else "🟡" if v >= 0.5 else "🔴"
+        st.progress(v, text=f"{color_bar} {k}: {v:.2f}")
 
 with detail_col:
-    st.write("**Recruiter summary**")
+    st.write("**📋 Recruiter Summary**")
     st.write(explanation["recruiter_summary"])
-    st.write("**Strengths**")
+    
+    st.write("**✨ Strengths**")
     for s in explanation["strengths"]:
-        st.write(f"- {s}")
-    st.write("**Weaknesses / gaps**")
+        st.write(f"✅ {s}")
+    
+    st.write("**⚠️ Weaknesses / Gaps**")
     if explanation["weaknesses"]:
         for w in explanation["weaknesses"]:
-            st.write(f"- {w}")
+            st.write(f"❌ {w}")
     else:
-        st.write("- None identified")
+        st.write("✅ None identified")
 
-with st.expander("Skill gap analysis", expanded=True):
+# Skill gap section with expandable detail
+with st.expander("🎯 Skill Gap Analysis", expanded=True):
     gap = explanation["skill_gap"]
-    st.write(f"Current match: {gap['current_match_pct']} %")
-    if gap["missing_skills"]:
-        st.write("Missing required skill categories:")
-        for missing in gap["missing_skills"]:
-            st.write(f"- {missing}")
-    if gap["improvement_suggestions"]:
-        st.write("Improvement suggestions:")
-        for suggestion in gap["improvement_suggestions"]:
-            st.write(f"- {suggestion}")
+    gap_cols1, gap_cols2 = st.columns(2)
+    
+    with gap_cols1:
+        st.metric("Current Match", f"{gap['current_match_pct']}%")
+        if gap["missing_skills"]:
+            st.write("**Missing required skills:**")
+            for missing in gap["missing_skills"]:
+                st.write(f"- 🔴 {missing}")
+    
+    with gap_cols2:
+        if gap["improvement_suggestions"]:
+            st.write("**Recommendations:**")
+            for i, suggestion in enumerate(gap["improvement_suggestions"], 1):
+                st.write(f"{i}. 💡 {suggestion}")
 
 if hp["is_honeypot"]:
-    st.error("⚠️ Flagged as a honeypot / internally-inconsistent profile: " + "; ".join(hp["reasons"]))
+    st.error(f"🚨 **Flagged Profile:** {'; '.join(hp['reasons'])}")
 
-with st.expander("Raw candidate reasoning and explanation bundle", expanded=False):
+with st.expander("📄 Raw Artifacts (Debug)", expanded=False):
     st.write("**Reasoning:**")
-    st.write(build_reasoning(feats, hp, selected_idx + 1))
-    st.write("**Explanation bundle:**")
+    st.code(build_reasoning(feats, hp, selected_idx + 1))
+    st.write("**Full Explanation Bundle:**")
     st.json(explanation)

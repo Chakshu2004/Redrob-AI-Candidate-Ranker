@@ -9,6 +9,20 @@ during ranking — per `submission_spec.md` Section 3.
 
 ## TL;DR — reproduce the submission
 
+Create and activate a Python virtual environment first:
+
+```bash
+python -m venv .venv
+# Windows PowerShell
+.\.venv\Scripts\Activate.ps1
+# Windows cmd
+.\.venv\Scripts\activate.bat
+# macOS / Linux
+source .venv/bin/activate
+```
+
+Install dependencies and run the ranker:
+
 ```bash
 pip install -r requirements.txt
 python rank.py --candidates ./candidates.jsonl --out ./submission.csv
@@ -27,15 +41,22 @@ measured on the real `candidates.jsonl`). Comfortably inside the 5-minute /
 
 ## Sandbox demo
 
+If you want to run the Streamlit frontend, activate the same virtual environment and install the sandbox requirements:
+
 ```bash
+# activate the same .venv created above
+# Windows PowerShell
+.\.venv\Scripts\Activate.ps1
+# Windows cmd
+.\.venv\Scripts\activate.bat
+# macOS / Linux
+source .venv/bin/activate
+
 pip install -r sandbox/requirements.txt
 streamlit run sandbox/app.py
 ```
 
-Runs the *identical* pipeline (no LLM, no network) on the bundled sample or
-an uploaded JSON/JSONL file (≤200 candidates), with a ranked table and a
-per-candidate detail view (score breakdown, strengths/weaknesses, skill-gap
-analysis, honeypot flag).
+Runs the *identical* pipeline (no LLM, no network) on the bundled sample or an uploaded JSON/JSONL file (≤200 candidates), with a ranked table and a per-candidate detail view (score breakdown, strengths/weaknesses, skill-gap analysis, honeypot flag).
 
 ---
 
